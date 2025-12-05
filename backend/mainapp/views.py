@@ -134,4 +134,88 @@ def signup(request):
             "error": "null"
             })
 
+@csrf_exempt
+def login(request):
+    if request.method == "POST":
+        try :
+            data = json.loads(request.body)
+        except :
+            return JsonResponse({
+                "success" : False, 
+                "message" : "Error to fetch JSON data.", 
+            }, status=400)
+        
+        email = data.get("email", "").strip()
+        password = data.get("password", "")
+        if not email:
+            return JsonResponse({
+                "success" :False, 
+                "message" : "Email must be there.", 
+            }, status=400)
+        
+        if not password:
+            return JsonResponse({
+                "success" :False, 
+                "message" : "Password must be there.", 
+            }, status=400)
+        
+        email_pattern = r"^[\w\.-]+@[\w\.-]+\.\w+$"
+        if not re.match(email_pattern, email):
+            return JsonResponse({
+                "success" :False, 
+                "message" : "Invalid email format.", 
+            }, status=400)
+        
+        if len(password) < 4:
+            return JsonResponse({
+                "success" :False, 
+                "message" : "Password must be at least 4 characters.", 
+            }, status=400)
+            
+        if password.isdigit():
+            return JsonResponse({
+                "success" :False, 
+                "message" : "Password cannot be only numbers.", 
+            }, status=400)
+        
+        if password.isalpha():
+            return JsonResponse({
+                "success" :False, 
+                "message" : "Password must contain numbers or special characters.", 
+            }, status=400)
+        
+        try:
+            user = User.objects.get(email=email)
+        except:
+            return JsonResponse({
+                "success" :False, 
+                "message" : "Invalid username or password", 
+            }, status=400)
+
+        payload = {
+        "user_id": user.id,
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
+        "iat": datetime.datetime.utcnow(),
+        }
+        token = jwt_utils.create_token(payload)
+        return JsonResponse({
+                "success": True,
+                "message": "Login successful.",
+                "data": {
+                        "user": {
+                                "id": user.id,
+                                "username": user.username,
+                                "email": user.email
+                                    },
+                        "tokens":{
+                                "access": token
+                                    }
+                            }
+                            } , status=200)
+    
+    return JsonResponse({
+        "success" : False, 
+        "message" : "Method does not allowed" 
+    })
+
 
