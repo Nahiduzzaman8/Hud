@@ -166,24 +166,6 @@ def login(request):
                 "message" : "Invalid email format.", 
             }, status=400)
         
-        if len(password) < 4:
-            return JsonResponse({
-                "success" :False, 
-                "message" : "Password must be at least 4 characters.", 
-            }, status=400)
-            
-        if password.isdigit():
-            return JsonResponse({
-                "success" :False, 
-                "message" : "Password cannot be only numbers.", 
-            }, status=400)
-        
-        if password.isalpha():
-            return JsonResponse({
-                "success" :False, 
-                "message" : "Password must contain numbers or special characters.", 
-            }, status=400)
-        
         try:
             user = User.objects.get(email=email)
         except:
@@ -191,6 +173,12 @@ def login(request):
                 "success" :False, 
                 "message" : "Invalid username or password", 
             }, status=400)
+        
+        if not user.check_password(password):
+            return JsonResponse({
+                                "success": False,
+                                "message": "Nahid"
+                                }, status=400)
 
         payload = {
         "user_id": user.id,
@@ -218,4 +206,5 @@ def login(request):
         "message" : "Method does not allowed" 
     })
 
-
+def news(request):
+    pass

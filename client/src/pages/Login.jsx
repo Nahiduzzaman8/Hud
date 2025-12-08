@@ -14,7 +14,7 @@ const LoginPage = () => {
 
   const getLoginResponse = async () => {
     try {
-      let response = await fetch("http://127.0.0.1:5000/login", {
+      let response = await fetch("http://127.0.0.1:8000/login/", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -22,20 +22,22 @@ const LoginPage = () => {
         body: JSON.stringify({ email, password }),
       });
       const data = await response.json();
-      
+
       if (!response.ok) {
         setMessage({
           type: "error",
           text: data.message || "Invalid credentials.",
         });
       } else {
-        localStorage.setItem("token", data.token);
+        localStorage.setItem("access", data.data.tokens.access);
+        localStorage.setItem("userId", data.data.user.id);
         setMessage({ type: "success", text: "Login successful!" });
 
         setTimeout(() => {
           navigate("/dashboard"); // React Router navigation
         }, 500);
       }
+
     } catch (err) {
       console.log(err);
       setMessage({ type: "error", text: "Server error. Try again later." });

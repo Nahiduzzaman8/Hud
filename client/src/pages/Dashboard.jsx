@@ -13,8 +13,6 @@ export default function Sidebar() {
   const [tempNews, setTempNews] = useState([]);
   const navigate = useNavigate()
 
-  
-
   const handleSubmit = (evt) => {
     evt.preventDefault();
     if (input != "") {
@@ -40,9 +38,9 @@ export default function Sidebar() {
     localStorage.removeItem("user");
     navigate("/login");;
   };
-
   
   useEffect(() => {
+    
   if (allprefs.length === 0) {
     setNews([]);       // Clear main news
     setTempNews([]);   // Clear temp search news
@@ -50,15 +48,23 @@ export default function Sidebar() {
 }, [allprefs]);
 
   useEffect(() => {
-    
     const getNews = async () => {
       try {
+        const token = localStorage.getItem("token");   // fetch token
+
         let response = await axios.post("http://127.0.0.1:5000/getNews", {
           allPrefs: p,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,   // send token to backend
+            "Content-Type": "application/json",
+          }
         });
         let data = response.data.organic_results;
         setNews((prev) => [...prev, ...data]);  
         setRaw((prev) => [...prev, [response.data]]);
+      
       } catch (error) {
         console.log("Nahid ",error);
       }
@@ -88,8 +94,6 @@ export default function Sidebar() {
 
   setTempNews(filteredNews);
 };
-
-
 
   return (
     <>

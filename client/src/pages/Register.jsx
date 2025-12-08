@@ -12,24 +12,27 @@ const Register = () => {
     e.preventDefault();
     const postData = async () => {
       try {
-        const response = await fetch("http://127.0.0.1:5000/register", {
+        const response = await fetch("http://127.0.0.1:8000/signup/", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ username, email, password }),
         });
-
+        console.log(response)
         const data = await response.json();
+
         if (response.ok) {
-          setMessage({ type: "success", text: "Registration successful!" });
+          setMessage({ type: "success", text: data.message });
           setTimeout(() => {
             navigate("/login"); // React Router navigation
           }, 800);
+
+        console.log(data)
         } else {
           setMessage({
             type: "error",
-            text: data.message || "Invalid credentials.",
+            text: "Server error. Try again later.",
           });
         }
       } catch (error) {
