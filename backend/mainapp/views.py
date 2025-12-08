@@ -205,6 +205,3 @@ def login(request):
         "success" : False, 
         "message" : "Method does not allowed" 
     })
-
-def news(request):
-    pass
