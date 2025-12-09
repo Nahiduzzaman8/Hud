@@ -225,3 +225,54 @@ def login(request):
 # def user_preferences_list(request):
 #     pass
 
+@csrf_exempt
+def dashboard(request):
+    if request.method == "GET":
+        token = request.COOKIES.get('access')
+        if not token :
+            return JsonResponse({
+                "success":False,
+                "message":"Invalid token"
+            }, status=401)
+        
+        payload = jwt_utils.decode_token(token)
+        if not payload :
+            return JsonResponse({
+                "success":False,
+                "message":"Invalid Payload"
+            }, status=401)
+        
+        user_id = payload["user_id"]
+        if not user_id :
+            return JsonResponse({
+                "success":False,
+                "message":"Invalid User ID"
+            }, status=401)
+        
+        try:
+            user = User.objects.get(id=9)
+        except User.DoesNotExist:
+            return JsonResponse({
+                "success": False, 
+                "message": "No user exists"}
+                , status=404)
+        
+        try:
+            preferences = Preferences.objects.filter(user=user)
+        except User.DoesNotExist:
+            return JsonResponse({
+                "success": False, 
+                "message": "No preferences exists"}
+                , status=404)
+        
+        prefs_list = [{"id": pref.id, 
+                       "name": pref.name} for pref in preferences]
+        
+        return JsonResponse({"success": True, 
+                             "preferences": prefs_list})
+
+    return JsonResponse({
+        "success": True, 
+        "message": "This will be replaced soon"
+        })
+
