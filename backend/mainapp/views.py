@@ -269,7 +269,8 @@ def dashboard(request):
                        "name": pref.name} for pref in preferences]
         
         return JsonResponse({"success": True, 
-                             "preferences": prefs_list})
+                             "preferences": prefs_list}
+                             , status=200)
 
     return JsonResponse({
         "success": True, 
