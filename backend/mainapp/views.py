@@ -3,6 +3,7 @@ from django.contrib.auth.models import User
 from django.views.decorators.csrf import csrf_exempt
 import re, jwt, json, datetime
 from mainapp.utils import jwt_utils 
+from .models import Preferences
 
 @csrf_exempt
 def signup(request):
@@ -177,7 +178,7 @@ def login(request):
         if not user.check_password(password):
             return JsonResponse({
                                 "success": False,
-                                "message": "Nahid"
+                                "message": "Invalid Email or Password"
                                 }, status=400)
 
         payload = {
@@ -186,20 +187,30 @@ def login(request):
         "iat": datetime.datetime.utcnow(),
         }
         token = jwt_utils.create_token(payload)
-        return JsonResponse({
-                "success": True,
-                "message": "Login successful.",
-                "data": {
-                        "user": {
-                                "id": user.id,
-                                "username": user.username,
-                                "email": user.email
-                                    },
-                        "tokens":{
-                                "access": token
-                                    }
-                            }
-                            } , status=200)
+
+        response = JsonResponse(
+            {
+            "success": True,
+            "message": "Login successful.",
+            "data": {
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email
+                },
+            }
+        }, status=200)
+
+        response.set_cookie(
+            key="access",
+            value=token,
+            httponly=True,      # protect from XSS
+            secure=False,       # True in production
+            samesite="Lax",
+            max_age=3600,
+            path="/",
+        )
+        return response
     
     return JsonResponse({
         "success" : False, 
@@ -209,3 +220,8 @@ def login(request):
 # @csrf_exempt
 # def user_preferences(request):
 #     pass
+
+# @csrf_exempt
+# def user_preferences_list(request):
+#     pass
+
