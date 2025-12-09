@@ -205,3 +205,7 @@ def login(request):
         "success" : False, 
         "message" : "Method does not allowed" 
     })
+
+# @csrf_exempt
+# def user_preferences(request):
+#     pass
