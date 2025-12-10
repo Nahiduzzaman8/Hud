@@ -8,4 +8,5 @@ urlpatterns = [
     path('login/', views.login, name='login'),
     path('user_preferences/', views.user_preferences, name='user_preferences'),
     path('add_user_preferences/', views.add_user_preferences, name='add_user_preferences'),
+    path("remove_user_preference/<str:pref_type>/remove/", views.remove_user_preference, name='remove_user_preference'),
 ]

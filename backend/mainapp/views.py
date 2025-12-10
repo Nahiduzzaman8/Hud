@@ -1,40 +1,9 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.contrib.auth.models import User
 from django.views.decorators.csrf import csrf_exempt
 import re, jwt, json, datetime
 from mainapp.utils import jwt_utils 
 from .models import User_preferences
-
-# def get_user_using_token(request):
-#     token = request.COOKIES.get('access')
-#     if not token :
-#         return JsonResponse({
-#             "success":False,
-#             "message":"Token required"
-#         }, status=401)
-    
-#     payload = jwt_utils.decode_token(token)
-#     if not payload :
-#         return JsonResponse({
-#             "success":False,
-#             "message":"Payload is empty"
-#         }, status=400)
-    
-#     user_id = payload["user_id"]
-#     if not user_id :
-#         return JsonResponse({
-#             "success":False,
-#             "message":"No user id has been found"
-#         }, status=404)
-    
-#     user = User.objects.get(id=user_id)
-#     if not user :
-#         return JsonResponse({
-#             "success":False,
-#             "message":"No user has been found"
-#         }, status=404)
-    
-#     return user
 
 def get_user_using_token(request):
     token = request.COOKIES.get('access')
@@ -67,7 +36,6 @@ def get_user_using_token(request):
             }, status=404)
     
     return user, None
-
 
 @csrf_exempt
 def signup(request):
@@ -284,36 +252,35 @@ def login(request):
 
 @csrf_exempt
 def user_preferences(request): 
+    user, error = get_user_using_token(request)
+    if error:    
+        return error
+
     if request.method == "GET":
-        user, error = get_user_using_token(request)
-        if error :
-            return error
-        
-        try:
-            preferences = User_preferences.objects.filter(user=user)
-        except Exception:
+        pref = User_preferences.objects.filter(user=user).first()
+        if pref is None:
             return JsonResponse({
-                "success": False, 
-                "message": "No preferences exists"}
-                , status=404)
+                "success": False,
+                "message": "No preferences found for this user."
+            }, status=404)
         
-        prefs_list = [{"id": pref.id, 
-                        "name": pref.user, 
-                        "categories": pref.categories, 
-                        "topics": pref.topics, 
-                        "sources": pref.sources, 
-                        "region": pref.region, 
-                        "language": pref.language
-                        } for pref in preferences]
         
-        return JsonResponse({"success": True, 
-                            "preferences": prefs_list}
-                            , status=200)
+        return JsonResponse({
+            "success": True,
+            "data": {
+                "id": pref.id,
+                "categories": pref.categories,
+                "topics": pref.topics,
+                "sources": pref.sources,
+                "region": pref.region,
+                "language": pref.language
+            }
+        }, status=200)
 
     return JsonResponse({
-        "success": True, 
-        "message": "This will be replaced soon"
-        })
+        "success": False,
+        "message": "Method not allowed"
+    }, status=405)
 
 @csrf_exempt
 def add_user_preferences(request):
@@ -373,5 +340,64 @@ def add_user_preferences(request):
         "success":False,
         "message":"Method does not allowed"
     }, status=405)
+
+@csrf_exempt
+def remove_user_preference(request, pref_type):
+    if request.method != "DELETE":
+        return JsonResponse({
+            "success":False, 
+            "message":"Method not allowed"
+        }, status=405)
+    
+    #validating preference type
+    if pref_type not in ["categories", "topics", "sources"] :
+        return JsonResponse({
+            "success": False,
+            "message":"Invalid preferences type" 
+        }, status=400)
+    
+    #Extract value from the link
+    value = request.GET.get("value")
+    if not value:
+        return JsonResponse({
+            "success": False,
+            "message": "Missing 'value' parameter"
+        }, status=400)
+    
+    #fetching user
+    user, error = get_user_using_token(request)
+    if error:
+        return error
+    
+    #fetching user preferences
+    pref = User_preferences.objects.filter(user=user).first()
+    if not pref:
+        return JsonResponse({
+            "success": False,
+            "message": "No preferences found for this user"
+        }, status=404)
+
+    current_list = getattr(pref, pref_type)
+    if value not in current_list:
+        return JsonResponse({
+            "success": False,
+            "message": f"'{value}' not found in {pref_type}"
+        }, status=404)
+    
+    current_list.remove(value)
+    setattr(pref, pref_type, current_list)
+    pref.save()
+
+    return JsonResponse({
+        "success": True,
+        "message": f"{pref_type[:-1].capitalize()} removed successfully",
+        "data": {
+            "categories": pref.categories,
+            "topics": pref.topics,
+            "sources": pref.sources,
+            "region": pref.region,
+            "language": pref.language
+        }
+    }, status=200)
 
 
