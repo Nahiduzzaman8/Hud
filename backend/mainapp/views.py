@@ -400,4 +400,42 @@ def remove_user_preference(request, pref_type):
         }
     }, status=200)
 
+@csrf_exempt
+def delete_all_preferences(request):
+    user, error = get_user_using_token(request)
+    if error:
+        return error
+
+    if request.method != "DELETE":
+        return JsonResponse({
+            "success": False,
+            "message": "Method not allowed"
+        }, status=405)
+
+    pref = User_preferences.objects.filter(user=user).first()
+    if not pref:
+        return JsonResponse({
+            "success": False,
+            "message": "No preferences found for this user"
+        }, status=404)
+
+    # Clear all preferences
+    pref.categories = []
+    pref.topics = []
+    pref.sources = []
+    pref.region = "global"
+    pref.language = "en"
+    pref.save()
+
+    return JsonResponse({
+        "success": True,
+        "message": "All preferences deleted successfully.",
+        "data": {
+            "categories": [],
+            "topics": [],
+            "sources": [],
+            "region": "global",
+            "language": "en"
+        }
+    }, status=200)
 
