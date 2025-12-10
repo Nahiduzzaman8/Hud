@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.views.decorators.csrf import csrf_exempt
 import re, jwt, json, datetime
 from mainapp.utils import jwt_utils 
-from .models import Preferences
+from .models import User_preferences
 
 # def get_user_using_token(request):
 #     token = request.COOKIES.get('access')
@@ -38,6 +38,7 @@ from .models import Preferences
 
 def get_user_using_token(request):
     token = request.COOKIES.get('access')
+    
     if not token:
         return None, JsonResponse({
             "success": False, 
@@ -50,8 +51,8 @@ def get_user_using_token(request):
             "success": False, 
             "message": "Payload is empty"
             }, status=400)
-    
-    user_id = payload.get("user_id")
+    user_id = payload["user_id"]
+
     if not user_id:
         return None, JsonResponse({"success": False, 
             "message": "No user id has been found"
@@ -261,6 +262,7 @@ def login(request):
                     "username": user.username,
                     "email": user.email
                 },
+                "token":token,
             }
         }, status=200)
 
@@ -283,49 +285,30 @@ def login(request):
 @csrf_exempt
 def user_preferences(request): 
     if request.method == "GET":
-        token = request.COOKIES.get('access')
-        if not token :
-            return JsonResponse({
-                "success":False,
-                "message":"Invalid token"
-            }, status=401)
-        
-        payload = jwt_utils.decode_token(token)
-        if not payload :
-            return JsonResponse({
-                "success":False,
-                "message":"Invalid Payload"
-            }, status=401)
-        
-        user_id = payload["user_id"]
-        if not user_id :
-            return JsonResponse({
-                "success":False,
-                "message":"Invalid User ID"
-            }, status=401)
+        user, error = get_user_using_token(request)
+        if error :
+            return error
         
         try:
-            user = User.objects.get(id=9)
-        except User.DoesNotExist:
-            return JsonResponse({
-                "success": False, 
-                "message": "No user exists"}
-                , status=404)
-        
-        try:
-            preferences = Preferences.objects.filter(user=user)
-        except User.DoesNotExist:
+            preferences = User_preferences.objects.filter(user=user)
+        except Exception:
             return JsonResponse({
                 "success": False, 
                 "message": "No preferences exists"}
                 , status=404)
         
         prefs_list = [{"id": pref.id, 
-                       "name": pref.name} for pref in preferences]
+                        "name": pref.user, 
+                        "categories": pref.categories, 
+                        "topics": pref.topics, 
+                        "sources": pref.sources, 
+                        "region": pref.region, 
+                        "language": pref.language
+                        } for pref in preferences]
         
         return JsonResponse({"success": True, 
-                             "preferences": prefs_list}
-                             , status=200)
+                            "preferences": prefs_list}
+                            , status=200)
 
     return JsonResponse({
         "success": True, 
@@ -340,7 +323,7 @@ def add_user_preferences(request):
         if error:
             return error
         
-        pref, created = Preferences.objects.get_or_create(user=user)
+        pref, created = User_preferences.objects.get_or_create(user=user)
 
         try:
             body = json.loads(request.body.decode("utf-8"))

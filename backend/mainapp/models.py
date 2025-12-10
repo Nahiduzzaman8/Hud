@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 
 
 # Create your models here.
-class Preferences(models.Model):
+class User_preferences(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="preferences")
     categories = models.JSONField(default=list)
     topics = models.JSONField(default=list)
