@@ -5,6 +5,69 @@ import re, jwt, json, datetime
 from mainapp.utils import jwt_utils 
 from .models import Preferences
 
+# def get_user_using_token(request):
+#     token = request.COOKIES.get('access')
+#     if not token :
+#         return JsonResponse({
+#             "success":False,
+#             "message":"Token required"
+#         }, status=401)
+    
+#     payload = jwt_utils.decode_token(token)
+#     if not payload :
+#         return JsonResponse({
+#             "success":False,
+#             "message":"Payload is empty"
+#         }, status=400)
+    
+#     user_id = payload["user_id"]
+#     if not user_id :
+#         return JsonResponse({
+#             "success":False,
+#             "message":"No user id has been found"
+#         }, status=404)
+    
+#     user = User.objects.get(id=user_id)
+#     if not user :
+#         return JsonResponse({
+#             "success":False,
+#             "message":"No user has been found"
+#         }, status=404)
+    
+#     return user
+
+def get_user_using_token(request):
+    token = request.COOKIES.get('access')
+    if not token:
+        return None, JsonResponse({
+            "success": False, 
+            "message": "Token required"
+            }, status=401)
+    
+    payload = jwt_utils.decode_token(token)
+    if not payload:
+        return None, JsonResponse({
+            "success": False, 
+            "message": "Payload is empty"
+            }, status=400)
+    
+    user_id = payload.get("user_id")
+    if not user_id:
+        return None, JsonResponse({"success": False, 
+            "message": "No user id has been found"
+            }, status=404)
+    
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return None, JsonResponse({
+            "success": False, 
+            "message": "No user has been found"
+            }, status=404)
+    
+    return user, None
+
+
 @csrf_exempt
 def signup(request):
     if request.method == "POST":
@@ -183,7 +246,7 @@ def login(request):
 
         payload = {
         "user_id": user.id,
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(days=12),
         "iat": datetime.datetime.utcnow(),
         }
         token = jwt_utils.create_token(payload)
@@ -215,18 +278,10 @@ def login(request):
     return JsonResponse({
         "success" : False, 
         "message" : "Method does not allowed" 
-    })
-
-# @csrf_exempt
-# def user_preferences(request):
-#     pass
-
-# @csrf_exempt
-# def user_preferences_list(request):
-#     pass
+    }, status=400)
 
 @csrf_exempt
-def dashboard(request):
+def user_preferences(request): 
     if request.method == "GET":
         token = request.COOKIES.get('access')
         if not token :
@@ -276,4 +331,64 @@ def dashboard(request):
         "success": True, 
         "message": "This will be replaced soon"
         })
+
+@csrf_exempt
+def add_user_preferences(request):
+    if request.method == "POST":
+        user, error= get_user_using_token(request)
+        
+        if error:
+            return error
+        
+        pref, created = Preferences.objects.get_or_create(user=user)
+
+        try:
+            body = json.loads(request.body.decode("utf-8"))
+        except Exception:
+            return JsonResponse({
+                "success": False,
+                "message":"Invalid JSON"
+            }, status = 400 )
+        
+        new_categories = body.get("categories", [])
+        new_topics = body.get("topics", [])
+        new_sources = body.get("sources", [])
+
+        if "region" in body:    
+            pref.region = body["region"]
+
+        if "language" in body:
+            pref.language = body["language"]
+        
+        # Validate types
+        if not isinstance(new_categories, list) or not isinstance(new_topics, list) or not isinstance(new_sources, list):
+                return JsonResponse({
+                    "success":False,
+                    "message": "categories/topics/sources must be lists"
+                    }, status=400)
+        
+        # ADD (append, avoid duplicates)
+        pref.categories = list(set(pref.categories + new_categories))
+        pref.topics = list(set(pref.topics + new_topics))
+        pref.sources = list(set(pref.sources + new_sources))
+
+        pref.save()
+
+        return JsonResponse({
+            "success": True,
+        "message": "Preference added successfully",
+        "data": {
+            "categories": pref.categories,
+            "topics": pref.topics,
+            "sources": pref.sources,
+            "region": pref.region,
+            "language": pref.language
+        }
+            }, status=201)
+    
+    return JsonResponse({
+        "success":False,
+        "message":"Method does not allowed"
+    }, status=405)
+
 

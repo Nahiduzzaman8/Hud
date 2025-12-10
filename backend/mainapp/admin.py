@@ -4,7 +4,7 @@ from .models import Preferences
 # Register your models here.
 @admin.register(Preferences)
 class PreferencesAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "name")
+    list_display = ("id", "user", "categories", "topics", "sources", "region", "language")
     search_fields = ("user", "name")
     ordering = ("id",)
 
