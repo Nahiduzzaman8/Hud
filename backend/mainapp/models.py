@@ -25,4 +25,5 @@ class SavedNews(models.Model):
     saved_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ("user", "url")  
+        unique_together = ("user", "url")
+

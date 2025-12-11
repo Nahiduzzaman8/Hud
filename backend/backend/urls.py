@@ -10,4 +10,6 @@ urlpatterns = [
     path('add_user_preferences/', views.add_user_preferences, name='add_user_preferences'),
     path("remove_user_preference/<str:pref_type>/remove/", views.remove_user_preference, name='remove_user_preference'),
     path("delete_all_preferences/", views.delete_all_preferences, name='delete_all_preferences'),
+    path("get_news/", views.get_news, name='get_news'),
+    
 ]

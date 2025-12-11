@@ -4,6 +4,15 @@ from django.views.decorators.csrf import csrf_exempt
 import re, jwt, json, datetime
 from mainapp.utils import jwt_utils 
 from .models import User_preferences
+import requests
+from itertools import product
+from urllib.parse import urlencode
+
+
+def build_topic_query(topics):
+    if not topics:
+        return None
+    return " OR ".join([f"({t})" for t in topics])
 
 def get_user_using_token(request):
     token = request.COOKIES.get('access')
@@ -36,6 +45,48 @@ def get_user_using_token(request):
             }, status=404)
     
     return user, None
+
+def generate_newsapi_urls(prefs,language="en", country="us"):
+    api_key="269e2c11b227414faccf57211539c6d6"
+    base_url = "https://newsapi.org/v2/top-headlines?"
+    urls = []
+
+    for category, topic in product(prefs.categories, prefs.topics):
+        params = {
+            "category": category,
+            "q": topic,
+            "language": language,
+            "country": country,
+            "apiKey": api_key,
+        }
+        url = base_url + urlencode(params)
+        urls.append(url)
+    return urls
+
+
+@csrf_exempt
+def get_news(request):
+    if request.method!="GET":
+        return JsonResponse({
+            "success":False,
+            "message":"Method does not allowed"
+        }, status=400)
+    
+    user, error = get_user_using_token(request)
+    if error:
+        return error
+    
+    prefs = User_preferences.objects.filter(user=user).first()
+    if prefs is None:
+            return JsonResponse({
+                "success": False,
+                "message": "No preferences found for this user."
+            }, status=404)
+    
+    for url in generate_newsapi_urls(prefs):
+        print(url)
+
+    return HttpResponse(3)
 
 @csrf_exempt
 def signup(request):
