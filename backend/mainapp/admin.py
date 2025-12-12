@@ -1,5 +1,5 @@
 from django.contrib import admin
-from mainapp.models import PreferenceCategory, User_preferences, SavedNews
+from mainapp.models import PreferenceCategory, UserPreferences, SavedNews
 
 # Register your models here.
 @admin.register(PreferenceCategory)
@@ -8,8 +8,8 @@ class PreferenceCategoryAdmin(admin.ModelAdmin):
     search_fields = ("user", "category")
     ordering = ("user",)
 
-@admin.register(User_preferences)
-class User_preferencesAdmin(admin.ModelAdmin):
+@admin.register(UserPreferences)
+class UserPreferencesAdmin(admin.ModelAdmin):
     list_display = ("id", "user","category", "topics", "sources", "region", "language")
     search_fields = ("user", "name")
     ordering = ("id",)

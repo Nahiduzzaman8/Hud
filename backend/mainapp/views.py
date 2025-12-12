@@ -3,11 +3,10 @@ from django.contrib.auth.models import User
 from django.views.decorators.csrf import csrf_exempt
 import re, jwt, json, datetime
 from mainapp.utils import jwt_utils 
-from .models import User_preferences
+from .models import UserPreferences,PreferenceCategory, SavedNews
 import requests
 from itertools import product
 from urllib.parse import urlencode
-
 
 def build_topic_query(topics):
     if not topics:
@@ -63,30 +62,237 @@ def generate_newsapi_urls(prefs,language="en", country="us"):
         urls.append(url)
     return urls
 
-
 @csrf_exempt
-def get_news(request):
-    if request.method!="GET":
-        return JsonResponse({
-            "success":False,
-            "message":"Method does not allowed"
-        }, status=400)
-    
+def get_user_preferences(request):
     user, error = get_user_using_token(request)
     if error:
         return error
-    
-    prefs = User_preferences.objects.filter(user=user).first()
-    if prefs is None:
+
+    if request.method != "GET":
+        return JsonResponse({
+            "success": False,
+            "message": "Method not allowed"
+        }, status=405)
+
+    # Fetch all preference rows for this user
+    preferences = UserPreferences.objects.filter(user=user).select_related("category")
+
+    if not preferences.exists():
+        return JsonResponse({
+            "success": False,
+            "message": "No preferences found for this user."
+        }, status=404)
+
+    # Serialize each preference entry
+    data = []
+    for pref in preferences:
+        data.append({
+            "id": pref.id,
+            "category": pref.category.category,   # category name
+            "topics": pref.topics,
+            "sources": pref.sources,
+            "region": pref.region,
+            "language": pref.language
+        })
+
+    return JsonResponse({
+        "success": True,
+        "count": len(data),
+        "data": data
+    }, status=200)
+
+# [
+#     { "category": "Technology",
+#       "topics": "AI", "sources": "",
+#       "region": "global",
+#       "language": "en"
+#     },
+#     { "category": "Football",
+#      "topics": "Hamza",
+#       "sources": "",
+#        "region": "global",
+#         "language": "en" 
+#     }, 
+#     { "category": "Politics", "topics": "BD Politics", "sources": "", "region": "global", "language": "en" }, 
+#     { "category": "Badminton", "topics": "Kim Jong Woong", "sources": "", "region": "global", "language": "en" }, 
+#     { "category": "Football", "topics": "Ronaldo", "sources": "", "region": "global", "language": "en" }
+# ]
+
+@csrf_exempt
+def add_user_preferences(request):
+    user, error = get_user_using_token(request)
+    if error:
+        return error
+
+    if request.method != "POST":
+        return JsonResponse({
+            "success": False,
+            "message": "Method not allowed"
+        }, status=405)
+
+    # Parse list of objects
+    try:
+        preferences_list = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({
+            "success": False,
+            "message": "Invalid JSON format"
+        }, status=400)
+
+    if not isinstance(preferences_list, list):
+        return JsonResponse({
+            "success": False,
+            "message": "Request body must be a list of preference objects"
+        }, status=400)
+
+    created_items = []
+
+    for item in preferences_list:
+        category_name = item.get("category")
+        topics = item.get("topics")
+        sources = item.get("sources", "")
+        region = item.get("region", "global")
+        language = item.get("language", "en")
+
+        # Validate required fields
+        if not category_name or not topics:
             return JsonResponse({
                 "success": False,
-                "message": "No preferences found for this user."
-            }, status=404)
-    
-    for url in generate_newsapi_urls(prefs):
-        print(url)
+                "message": "Each item must contain at least 'category' and 'topics'"
+            }, status=400)
 
-    return HttpResponse(3)
+        # 1. Ensure category exists for user
+        category_obj, _ = PreferenceCategory.objects.get_or_create(
+            user=user,
+            category=category_name.strip()
+        )
+
+        # 2. Create or get the user preference
+        pref, created = UserPreferences.objects.get_or_create(
+            user=user,
+            category=category_obj,
+            topics=topics.strip(),
+            sources=sources.strip(),
+            defaults={
+                "region": region,
+                "language": language
+            }
+        )
+
+        if created:
+            created_items.append({
+                "category": category_name,
+                "topics": topics,
+                "sources": sources,
+                "region": region,
+                "language": language
+            })
+
+    return JsonResponse({
+        "success": True,
+        "message": "Preferences processed successfully",
+        "created_count": len(created_items),
+        "created": created_items
+    }, status=201)
+
+# {
+#     "category": "Football",
+#     "topics": "Hamza"
+# }
+
+@csrf_exempt
+def remove_user_preference(request):
+    if request.method != "DELETE":
+        return JsonResponse({
+            "success": False,
+            "message": "Method not allowed"
+        }, status=405)
+
+    user, error = get_user_using_token(request)
+    if error:
+        return error
+
+    # Parse JSON body
+    try:
+        body = json.loads(request.body.decode("utf-8"))
+    except:
+        return JsonResponse({
+            "success": False,
+            "message": "Invalid JSON body"
+        }, status=400)
+
+    category_name = body.get("category")
+    topic_name = body.get("topics")
+
+    if not category_name or not topic_name:
+        return JsonResponse({
+            "success": False,
+            "message": "'category' and 'topics' fields are required"
+        }, status=400)
+
+    # Step 1: Find category belonging to this user
+    try:
+        category_obj = PreferenceCategory.objects.get(
+            user=user,
+            category=category_name
+        )
+    except PreferenceCategory.DoesNotExist:
+        return JsonResponse({
+            "success": False,
+            "message": "Category not found for this user"
+        }, status=404)
+
+    # Step 2: Find the specific preference row (category + topic)
+    try:
+        pref = UserPreferences.objects.get(
+            user=user,
+            category=category_obj,
+            topics=topic_name
+        )
+    except UserPreferences.DoesNotExist:
+        return JsonResponse({
+            "success": False,
+            "message": "Topic not found for this category"
+        }, status=404)
+
+    # Step 3: Delete only the topic row
+    pref.delete()
+
+    return JsonResponse({
+        "success": True,
+        "message": f"Topic '{topic_name}' removed from category '{category_name}'"
+    }, status=200)
+
+@csrf_exempt
+def delete_all_preferences(request):
+    # Authenticate user
+    user, error = get_user_using_token(request)
+    if error:
+        return error
+
+    # Validate method
+    if request.method != "DELETE":
+        return JsonResponse({
+            "success": False,
+            "message": "Method not allowed"
+        }, status=405)
+
+    # Fetch all preferences for the user
+    prefs = UserPreferences.objects.filter(user=user)
+    
+    if not prefs.exists():
+        return JsonResponse({
+            "success": False,
+            "message": "No preferences found for this user"
+        }, status=404)
+
+    # Delete all preference rows
+    prefs.delete()
+
+    return JsonResponse({
+        "success": True,
+        "message": "All preference records deleted successfully.",
+    }, status=200)
 
 @csrf_exempt
 def signup(request):
@@ -302,191 +508,25 @@ def login(request):
     }, status=400)
 
 @csrf_exempt
-def user_preferences(request): 
+def get_news(request):
+    if request.method!="GET":
+        return JsonResponse({
+            "success":False,
+            "message":"Method does not allowed"
+        }, status=400)
+    
     user, error = get_user_using_token(request)
-    if error:    
+    if error:
         return error
-
-    if request.method == "GET":
-        pref = User_preferences.objects.filter(user=user).first()
-        if pref is None:
+    
+    prefs = UserPreferences.objects.filter(user=user).first()
+    if prefs is None:
             return JsonResponse({
                 "success": False,
                 "message": "No preferences found for this user."
             }, status=404)
-        
-        
-        return JsonResponse({
-            "success": True,
-            "data": {
-                "id": pref.id,
-                "categories": pref.categories,
-                "topics": pref.topics,
-                "sources": pref.sources,
-                "region": pref.region,
-                "language": pref.language
-            }
-        }, status=200)
-
-    return JsonResponse({
-        "success": False,
-        "message": "Method not allowed"
-    }, status=405)
-
-@csrf_exempt
-def add_user_preferences(request):
-    if request.method == "POST":
-        user, error= get_user_using_token(request)
-        
-        if error:
-            return error
-        
-        pref, created = User_preferences.objects.get_or_create(user=user)
-
-        try:
-            body = json.loads(request.body.decode("utf-8"))
-        except Exception:
-            return JsonResponse({
-                "success": False,
-                "message":"Invalid JSON"
-            }, status = 400 )
-        
-        new_categories = body.get("categories", [])
-        new_topics = body.get("topics", [])
-        new_sources = body.get("sources", [])
-
-        if "region" in body:    
-            pref.region = body["region"]
-
-        if "language" in body:
-            pref.language = body["language"]
-        
-        # Validate types
-        if not isinstance(new_categories, list) or not isinstance(new_topics, list) or not isinstance(new_sources, list):
-                return JsonResponse({
-                    "success":False,
-                    "message": "categories/topics/sources must be lists"
-                    }, status=400)
-        
-        # ADD (append, avoid duplicates)
-        pref.categories = list(set(pref.categories + new_categories))
-        pref.topics = list(set(pref.topics + new_topics))
-        pref.sources = list(set(pref.sources + new_sources))
-
-        pref.save()
-
-        return JsonResponse({
-            "success": True,
-        "message": "Preference added successfully",
-        "data": {
-            "categories": pref.categories,
-            "topics": pref.topics,
-            "sources": pref.sources,
-            "region": pref.region,
-            "language": pref.language
-        }
-            }, status=201)
     
-    return JsonResponse({
-        "success":False,
-        "message":"Method does not allowed"
-    }, status=405)
+    for url in generate_newsapi_urls(prefs):
+        print(url)
 
-@csrf_exempt
-def remove_user_preference(request, pref_type):
-    if request.method != "DELETE":
-        return JsonResponse({
-            "success":False, 
-            "message":"Method not allowed"
-        }, status=405)
-    
-    #validating preference type
-    if pref_type not in ["categories", "topics", "sources"] :
-        return JsonResponse({
-            "success": False,
-            "message":"Invalid preferences type" 
-        }, status=400)
-    
-    #Extract value from the link
-    value = request.GET.get("value")
-    if not value:
-        return JsonResponse({
-            "success": False,
-            "message": "Missing 'value' parameter"
-        }, status=400)
-    
-    #fetching user
-    user, error = get_user_using_token(request)
-    if error:
-        return error
-    
-    #fetching user preferences
-    pref = User_preferences.objects.filter(user=user).first()
-    if not pref:
-        return JsonResponse({
-            "success": False,
-            "message": "No preferences found for this user"
-        }, status=404)
-
-    current_list = getattr(pref, pref_type)
-    if value not in current_list:
-        return JsonResponse({
-            "success": False,
-            "message": f"'{value}' not found in {pref_type}"
-        }, status=404)
-    
-    current_list.remove(value)
-    setattr(pref, pref_type, current_list)
-    pref.save()
-
-    return JsonResponse({
-        "success": True,
-        "message": f"{pref_type[:-1].capitalize()} removed successfully",
-        "data": {
-            "categories": pref.categories,
-            "topics": pref.topics,
-            "sources": pref.sources,
-            "region": pref.region,
-            "language": pref.language
-        }
-    }, status=200)
-
-@csrf_exempt
-def delete_all_preferences(request):
-    user, error = get_user_using_token(request)
-    if error:
-        return error
-
-    if request.method != "DELETE":
-        return JsonResponse({
-            "success": False,
-            "message": "Method not allowed"
-        }, status=405)
-
-    pref = User_preferences.objects.filter(user=user).first()
-    if not pref:
-        return JsonResponse({
-            "success": False,
-            "message": "No preferences found for this user"
-        }, status=404)
-
-    # Clear all preferences
-    pref.categories = []
-    pref.topics = []
-    pref.sources = []
-    pref.region = "global"
-    pref.language = "en"
-    pref.save()
-
-    return JsonResponse({
-        "success": True,
-        "message": "All preferences deleted successfully.",
-        "data": {
-            "categories": [],
-            "topics": [],
-            "sources": [],
-            "region": "global",
-            "language": "en"
-        }
-    }, status=200)
-
+    return HttpResponse(3)

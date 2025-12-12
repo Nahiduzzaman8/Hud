@@ -7,14 +7,18 @@ class PreferenceCategory(models.Model):
     def __str__(self):
         return self.category
 
+
 # Create your models here.
-class User_preferences(models.Model):
+class UserPreferences(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="preferences")
     category = models.ForeignKey(PreferenceCategory, on_delete=models.CASCADE, related_name="categories")
     topics = models.CharField(max_length=20)
     sources = models.CharField(max_length=20, blank=True)
     region = models.CharField(max_length=50, default="global")
     language = models.CharField(max_length=50, default="en")
+
+    class Meta:
+        unique_together = ("user", "category", "topics", "sources")
 
     def __str__(self):
         return f"{self.user.username} Preferences"

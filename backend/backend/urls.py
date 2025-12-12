@@ -6,9 +6,9 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('signup/', views.signup, name='signup'),
     path('login/', views.login, name='login'),
-    path('user_preferences/', views.user_preferences, name='user_preferences'),
+    path('get_user_preferences/', views.get_user_preferences, name='get_user_preferences'),
     path('add_user_preferences/', views.add_user_preferences, name='add_user_preferences'),
-    path("remove_user_preference/<str:pref_type>/remove/", views.remove_user_preference, name='remove_user_preference'),
+    path("remove_user_preference/", views.remove_user_preference, name='remove_user_preference'),
     path("delete_all_preferences/", views.delete_all_preferences, name='delete_all_preferences'),
     path("get_news/", views.get_news, name='get_news'),
     
