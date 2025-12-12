@@ -7,11 +7,7 @@ from .models import UserPreferences,PreferenceCategory, SavedNews
 import requests
 from itertools import product
 from urllib.parse import urlencode
-
-def build_topic_query(topics):
-    if not topics:
-        return None
-    return " OR ".join([f"({t})" for t in topics])
+from urllib.parse import urlparse, parse_qs
 
 def get_user_using_token(request):
     token = request.COOKIES.get('access')
@@ -45,22 +41,71 @@ def get_user_using_token(request):
     
     return user, None
 
-def generate_newsapi_urls(prefs,language="en", country="us"):
-    api_key="269e2c11b227414faccf57211539c6d6"
-    base_url = "https://newsapi.org/v2/top-headlines?"
+def generate_newsapi_urls(preferences):
+    api_key = "269e2c11b227414faccf57211539c6d6"
+    base_url = "https://newsapi.org/v2/everything?"
     urls = []
 
-    for category, topic in product(prefs.categories, prefs.topics):
+    for pref in preferences:
         params = {
-            "category": category,
-            "q": topic,
-            "language": language,
-            "country": country,
+            "q": pref.topics,
+            "language": pref.language,
             "apiKey": api_key,
         }
         url = base_url + urlencode(params)
-        urls.append(url)
+
+        urls.append({
+            "url": url,
+            "category": pref.category.category,
+            "topic": pref.topics
+        })
+
     return urls
+
+
+def find_q (url):
+    parsed = urlparse(url)
+    query_params = parse_qs(parsed.query)
+    
+    return query_params.get("q", [""])[0]
+
+
+@csrf_exempt
+def get_news(request):
+    if request.method!="GET":
+        return JsonResponse({
+            "success":False,
+            "message":"Method does not allowed"
+        }, status=400)
+    
+    user, error = get_user_using_token(request)
+    if error:
+        return error
+    
+    preferences = UserPreferences.objects.filter(user=user).select_related("category")
+    if preferences is None:
+            return JsonResponse({
+                "success": False,
+                "message": "No preferences found for this user."
+            }, status=404)
+
+    articles = []
+    for item in (generate_newsapi_urls(preferences)):
+        response = requests.get(item["url"])
+        data = response.json()
+        
+        articles.append({
+            "url":item["url"],
+            "topic":item["topic"],
+            "category":item["category"],
+            "articles":data["articles"][:6]
+                            })
+    
+    urls = generate_newsapi_urls(preferences)
+    return JsonResponse({
+        "total_urls": len(urls),
+        "Outputs": articles
+    }, status=200)
 
 @csrf_exempt
 def get_user_preferences(request):
@@ -117,7 +162,6 @@ def get_user_preferences(request):
 #     { "category": "Badminton", "topics": "Kim Jong Woong", "sources": "", "region": "global", "language": "en" }, 
 #     { "category": "Football", "topics": "Ronaldo", "sources": "", "region": "global", "language": "en" }
 # ]
-
 @csrf_exempt
 def add_user_preferences(request):
     user, error = get_user_using_token(request)
@@ -507,26 +551,3 @@ def login(request):
         "message" : "Method does not allowed" 
     }, status=400)
 
-@csrf_exempt
-def get_news(request):
-    if request.method!="GET":
-        return JsonResponse({
-            "success":False,
-            "message":"Method does not allowed"
-        }, status=400)
-    
-    user, error = get_user_using_token(request)
-    if error:
-        return error
-    
-    prefs = UserPreferences.objects.filter(user=user).first()
-    if prefs is None:
-            return JsonResponse({
-                "success": False,
-                "message": "No preferences found for this user."
-            }, status=404)
-    
-    for url in generate_newsapi_urls(prefs):
-        print(url)
-
-    return HttpResponse(3)
