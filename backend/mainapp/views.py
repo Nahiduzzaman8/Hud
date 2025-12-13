@@ -732,3 +732,23 @@ def login(request):
         "message" : "Method does not allowed" 
     }, status=400)
 
+# fetch("/api/logout/", {
+#   method: "POST",
+#   credentials: "include"
+# });
+
+@csrf_exempt
+def logout(request):
+    user, error = getUser(request)
+    if error:
+        return error
+
+    response = JsonResponse({
+        "success": True,
+        "message": "Logged out successfully"
+    })
+
+    response.delete_cookie("access_token")
+    response.delete_cookie("refresh_token")
+
+    return response
