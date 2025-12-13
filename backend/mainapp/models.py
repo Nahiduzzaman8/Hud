@@ -27,7 +27,7 @@ class UserPreferences(models.Model):
 class SavedNews(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="saved_news")
     title = models.CharField(max_length=500)
-    url = models.URLField()  
+    url = models.URLField()
     source = models.CharField(max_length=100)
     description = models.TextField(null=True, blank=True)
     published_at = models.DateTimeField(null=True, blank=True)
@@ -35,4 +35,5 @@ class SavedNews(models.Model):
 
     class Meta:
         unique_together = ("user", "url")
+
 

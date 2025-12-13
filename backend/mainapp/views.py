@@ -9,7 +9,7 @@ from itertools import product
 from urllib.parse import urlencode
 from urllib.parse import urlparse, parse_qs
 
-def get_user_using_token(request):
+def getUser(request):
     token = request.COOKIES.get('access')
     
     if not token:
@@ -62,7 +62,6 @@ def generate_newsapi_urls(preferences):
 
     return urls
 
-
 def find_q (url):
     parsed = urlparse(url)
     query_params = parse_qs(parsed.query)
@@ -70,46 +69,225 @@ def find_q (url):
     return query_params.get("q", [""])[0]
 
 
+#frontend request
+# {
+#   "category": "Technology",
+#   "topic": "AI",
+#   "article": {
+#     "title": "Mozilla announces an AI ‘window’ for Firefox",
+#     "url": "https://www.theverge.com/news/820196/mozilla-firefox-ai-window-browser",
+#     "source": "The Verge",
+#     "description": "Another day, another AI browser...",
+#     "published_at": "2025-11-13T17:26:41Z"
+#   }
+# }
+
 @csrf_exempt
-def get_news(request):
-    if request.method!="GET":
+def save_news(request):
+    if request.method != "POST":
         return JsonResponse({
-            "success":False,
-            "message":"Method does not allowed"
+            "success": False,
+            "message": "Method does not allowed"
         }, status=400)
     
-    user, error = get_user_using_token(request)
+    user, error = getUser(request)
     if error:
         return error
     
-    preferences = UserPreferences.objects.filter(user=user).select_related("category")
-    if preferences is None:
+    try:
+        body = json.loads(request.body)
+    except Exception:
+        return JsonResponse({
+            "success" : False, 
+            "message": "Invalid json"
+        }, status=400)
+    
+    article = body.get('article')
+    if not article:
+        return JsonResponse({
+            "success":False, 
+            "message" : "Missing article data"
+        }, status=400)
+    
+    required_fields = ["title", "url", "published_at"]
+    for field in required_fields:
+        if field not in article:
             return JsonResponse({
-                "success": False,
-                "message": "No preferences found for this user."
+                "success":False, 
+                "message":f"Missing article field: {field}"
             }, status=404)
+        
+    try:
+        saved, created = SavedNews.objects.get_or_create(
+            user=user,
+            url=article["url"],
+            defaults={
+                "title": article["title"],
+                "source": article["source"],
+                "description": article.get("description"),
+                "published_at": article.get("published_at"),
+            }
+        )
+    except Exception:
+        return JsonResponse({
+            "success": False,
+            "message": "Something went wrong. Failed to save article"
+        }, status=500)
+    
+    if not created:
+        return JsonResponse({
+            "success": False,
+            "message": "Article already saved"
+        }, status=409)
+
+    return JsonResponse({
+        "success": True,
+        "message": "Article saved successfully"
+    }, status=201)
+
+@csrf_exempt
+def get_saved_news(request):
+    if request.method != "GET":
+        return JsonResponse({
+            "success": False,
+            "message": "Method not allowed"
+        }, status=405)
+
+    user, error = getUser(request)
+    if error:
+        return error
+
+    saved_news = SavedNews.objects.filter(user=user)
+
+    if not saved_news.exists():
+        return JsonResponse({
+            "success": False,
+            "message": "No bookmarked news found for this user"
+        }, status=404)
+
+    result = []
+    for news in saved_news:
+        result.append({
+            "id": news.id,
+            "title": news.title,
+            "url": news.url,
+            "source": news.source if news.published_at else None,
+            "description": news.description,
+            "published_at": news.published_at.isoformat() if news.published_at else None,
+            "saved_at": news.saved_at.isoformat(),
+        })
+
+    return JsonResponse({
+        "success": True,
+        "message": "News fetched successfully",
+        "count": len(result),
+        "news": result
+    }, status=200)
+
+@csrf_exempt
+def delete_saved_news(request, news_id):
+    if request.method != "DELETE":
+        return JsonResponse({
+            "success": False,
+            "message": "Method not allowed"
+        }, status=405)
+
+    user, error = getUser(request)
+    if error:
+        return error
+
+    try:
+        news = SavedNews.objects.get(id=news_id, user=user)
+    except SavedNews.DoesNotExist:
+        return JsonResponse({
+            "success": False,
+            "message": "Saved news not found"
+        }, status=404)
+
+    news.delete()
+
+    return JsonResponse({
+        "success": True,
+        "message": "Saved news deleted successfully"
+    }, status=200)
+
+@csrf_exempt
+def delete_all_saved_news(request):
+    if request.method != "DELETE":
+        return JsonResponse({
+            "success": False, 
+            "message" : "Method does not allowed"
+        }, status = 405)
+
+    user , error = getUser(request)
+    if error :
+        return error
+    
+    saved_news = SavedNews.objects.filter(user=user)
+    if not saved_news :
+        return JsonResponse({
+            "success" : False, 
+            "message" : "This user does not have any bookmarked news"
+        }, status=400)
+    
+    saved_news.delete()
+    return JsonResponse({
+        "success" : False, 
+        "message" : "All news deleted"
+    }, status=200)
+
+@csrf_exempt
+def get_news(request):
+    if request.method != "GET":
+        return JsonResponse({
+            "success": False,
+            "message": "Method not allowed"
+        }, status=405)
+
+    # Authenticate user via JWT cookie
+    user, error = getUser(request)
+    if error:
+        return error
+
+    # Fetch preferences
+    preferences = (
+        UserPreferences.objects
+        .filter(user=user)
+        .select_related("category")
+    )
+
+    if not preferences.exists():
+        return JsonResponse({
+            "success": False,
+            "message": "No preferences found for this user."
+        }, status=404)
 
     articles = []
-    for item in (generate_newsapi_urls(preferences)):
-        response = requests.get(item["url"])
-        data = response.json()
-        
-        articles.append({
-            "url":item["url"],
-            "topic":item["topic"],
-            "category":item["category"],
-            "articles":data["articles"][:6]
-                            })
-    
     urls = generate_newsapi_urls(preferences)
+
+    for item in urls:
+        try:
+            response = requests.get(item["url"], timeout=5)
+            response.raise_for_status()
+            data = response.json()
+        except requests.RequestException:
+            continue  # fail gracefully for one API failure
+
+        articles.append({
+            "category": item["category"],
+            "topic": item["topic"],
+            "articles": data.get("articles", [])[:6]
+        })
+
     return JsonResponse({
+        "success": True,
         "total_urls": len(urls),
-        "Outputs": articles
+        "results": articles
     }, status=200)
 
 @csrf_exempt
 def get_user_preferences(request):
-    user, error = get_user_using_token(request)
+    user, error = getUser(request)
     if error:
         return error
 
@@ -164,7 +342,7 @@ def get_user_preferences(request):
 # ]
 @csrf_exempt
 def add_user_preferences(request):
-    user, error = get_user_using_token(request)
+    user, error = getUser(request)
     if error:
         return error
 
@@ -252,7 +430,7 @@ def remove_user_preference(request):
             "message": "Method not allowed"
         }, status=405)
 
-    user, error = get_user_using_token(request)
+    user, error = getUser(request)
     if error:
         return error
 
@@ -310,7 +488,7 @@ def remove_user_preference(request):
 @csrf_exempt
 def delete_all_preferences(request):
     # Authenticate user
-    user, error = get_user_using_token(request)
+    user, error = getUser(request)
     if error:
         return error
 
