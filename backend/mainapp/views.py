@@ -215,25 +215,28 @@ def delete_saved_news(request, news_id):
 def delete_all_saved_news(request):
     if request.method != "DELETE":
         return JsonResponse({
-            "success": False, 
-            "message" : "Method does not allowed"
-        }, status = 405)
+            "success": False,
+            "message": "Method not allowed"
+        }, status=405)
 
-    user , error = getUser(request)
-    if error :
+    user, error = getUser(request)
+    if error:
         return error
-    
-    saved_news = SavedNews.objects.filter(user=user)
-    if not saved_news :
+
+    queryset = SavedNews.objects.filter(user=user)
+
+    if not queryset.exists():
         return JsonResponse({
-            "success" : False, 
-            "message" : "This user does not have any bookmarked news"
-        }, status=400)
-    
-    saved_news.delete()
+            "success": False,
+            "message": "No saved news found for this user"
+        }, status=404)
+
+    deleted_count, _ = queryset.delete()
+
     return JsonResponse({
-        "success" : False, 
-        "message" : "All news deleted"
+        "success": True,
+        "message": "All saved news deleted successfully",
+        "deleted_count": deleted_count
     }, status=200)
 
 @csrf_exempt
@@ -423,7 +426,7 @@ def add_user_preferences(request):
 # }
 
 @csrf_exempt
-def remove_user_preference(request):
+def delete_user_preference(request):
     if request.method != "DELETE":
         return JsonResponse({
             "success": False,
