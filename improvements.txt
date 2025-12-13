@@ -1,0 +1,19 @@
+*Addd refresh token
+*Remove csrf_exempt where cookies are used
+*Add caching for News API
+*Move to DRF APIView / JWTAuthentication
+*How does logout work in JWT authentication?
+        JWT is stateless, so logout does not invalidate the token server-side.
+        Logout works by removing the JWT from client storage (cookie or localStorage).
+        For higher security, token blacklisting or short-lived access tokens with refresh tokens are used.
+
+*Issue in add_user_preferences
+        If one item fails, the entire request stops.
+        Better:
+        Validate all
+        Insert valid ones
+        Return partial success
+
+
+
+

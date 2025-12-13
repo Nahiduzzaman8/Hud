@@ -343,6 +343,14 @@ def get_user_preferences(request):
 #     { "category": "Badminton", "topics": "Kim Jong Woong", "sources": "", "region": "global", "language": "en" }, 
 #     { "category": "Football", "topics": "Ronaldo", "sources": "", "region": "global", "language": "en" }
 # ]
+
+# Issue in add_user_preferences
+# If one item fails, the entire request stops.
+# Better:
+# Validate all
+# Insert valid ones
+# Return partial success
+
 @csrf_exempt
 def add_user_preferences(request):
     user, error = getUser(request)
@@ -697,7 +705,7 @@ def login(request):
 
         payload = {
         "user_id": user.id,
-        "exp": datetime.datetime.utcnow() + datetime.timedelta(days=12),
+        "exp": datetime.datetime.utcnow() + datetime.timedelta(hours=1),
         "iat": datetime.datetime.utcnow(),
         }
         token = jwt_utils.create_token(payload)
@@ -737,18 +745,22 @@ def login(request):
 #   credentials: "include"
 # });
 
+# How does logout work in JWT authentication?
+# JWT is stateless, so logout does not invalidate the token server-side.
+# Logout works by removing the JWT from client storage (cookie or localStorage).
+# For higher security, token blacklisting or short-lived access tokens with refresh tokens are used.
 @csrf_exempt
 def logout(request):
-    user, error = getUser(request)
-    if error:
-        return error
-
     response = JsonResponse({
         "success": True,
         "message": "Logged out successfully"
     })
 
-    response.delete_cookie("access_token")
-    response.delete_cookie("refresh_token")
+    response.delete_cookie(
+        key="access",
+        path="/",
+        samesite="Lax"
+    )
 
     return response
+

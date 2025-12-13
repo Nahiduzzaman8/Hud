@@ -15,6 +15,4 @@ urlpatterns = [
     path("get_saved_news/", views.get_saved_news, name="get_saved_news"),
     path("delete_saved_news/<int:news_id>", views.delete_saved_news, name="delete_saved_news"),
     path("delete_all_saved_news/", views.delete_all_saved_news, name="delete_all_saved_news"),
-    
-
 ]
