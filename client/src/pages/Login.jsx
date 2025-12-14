@@ -12,37 +12,38 @@ const LoginPage = () => {
     getLoginResponse();
   };
 
-  const getLoginResponse = async () => {
-    try {
-      let response = await fetch("http://127.0.0.1:8000/login/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
+ const getLoginResponse = async () => {
+  try {
+    const response = await fetch("http://127.0.0.1:8000/login/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      credentials: "include", // REQUIRED
+      body: JSON.stringify({ email, password }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      setMessage({
+        type: "error",
+        text: data.message || "Invalid credentials",
       });
-      const data = await response.json();
-
-      if (!response.ok) {
-        setMessage({
-          type: "error",
-          text: data.message || "Invalid credentials.",
-        });
-      } else {
-        localStorage.setItem("access", data.data.tokens.access);
-        localStorage.setItem("userId", data.data.user.id);
-        setMessage({ type: "success", text: "Login successful!" });
-
-        setTimeout(() => {
-          navigate("/dashboard"); // React Router navigation
-        }, 500);
-      }
-
-    } catch (err) {
-      console.log(err);
-      setMessage({ type: "error", text: "Server error. Try again later." });
+      return;
     }
-  };
+
+    setMessage({ type: "success", text: "Login successful" });
+
+    setTimeout(() => {
+      navigate("/dashboard");
+    }, 500);
+
+  } catch (err) {
+    console.error(err);
+    setMessage({ type: "error", text: "Server error" });
+  }
+};
 
   return (
     <div>

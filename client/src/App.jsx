@@ -1,26 +1,25 @@
-import { Route, Routes } from "react-router-dom";
-import Dashboard from "./pages/Dashboard";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-// import ProtectedRoute from "./components/ProtectedRoute";
+// src/App.jsx
+import React from "react";
+import { Routes, Route, Navigate } from "react-router-dom";
+import Signup from "./components/Signup";
+import Login from "./components/Login"; // create this next
+// import Dashboard from "./components/Dashboard"; // example protected page
 
 function App() {
   return (
     <Routes>
-      {/* Public routes */}
-      <Route path="/" element={<Register />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/dashboard" element={<Dashboard />} />
+      {/* Default route */}
+      <Route path="/" element={<Navigate to="/signup" />} />
 
-      {/* Protected route
+      {/* Public pages */}
       <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute>
-            
-          </ProtectedRoute>
-        }
-      /> */}
+        path="/signup"
+        element={<Signup onLoginRedirect={() => window.location.href = "/login"} />}
+      />
+      <Route path="/login" element={<Login />} />
+
+      {/* Protected page example
+      <Route path="/dashboard" element={<Dashboard />} /> */}
     </Routes>
   );
 }
