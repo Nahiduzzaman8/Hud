@@ -2,7 +2,6 @@ from django.db import models
 from django.contrib.auth.models import User
 
 class PreferenceCategory(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='preference_categories')
     category = models.CharField(max_length=15)
     def __str__(self):
         return self.category
@@ -13,12 +12,12 @@ class UserPreferences(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="preferences")
     category = models.ForeignKey(PreferenceCategory, on_delete=models.CASCADE, related_name="categories")
     topics = models.CharField(max_length=20)
-    sources = models.CharField(max_length=20, blank=True)
+    sources = models.CharField(max_length=20, blank=True, default= "")
     region = models.CharField(max_length=50, default="global")
     language = models.CharField(max_length=50, default="en")
 
     class Meta:
-        unique_together = ("user", "category", "topics", "sources")
+        unique_together = ("user", "category", "topics")
 
     def __str__(self):
         return f"{self.user.username} Preferences"

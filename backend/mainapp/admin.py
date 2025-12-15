@@ -4,9 +4,9 @@ from mainapp.models import PreferenceCategory, UserPreferences, SavedNews
 # Register your models here.
 @admin.register(PreferenceCategory)
 class PreferenceCategoryAdmin(admin.ModelAdmin):
-    list_display = ("id", "user", "category")
-    search_fields = ("user", "category")
-    ordering = ("user",)
+    list_display = ("id", "category")
+    search_fields = ( "category",)
+    ordering = ("id",)
 
 @admin.register(UserPreferences)
 class UserPreferencesAdmin(admin.ModelAdmin):

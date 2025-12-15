@@ -383,9 +383,9 @@ def add_user_preferences(request):
     for item in preferences_list:
         category_name = item.get("category")
         topics = item.get("topics")
-        sources = item.get("sources", "")
-        region = item.get("region", "global")
-        language = item.get("language", "en")
+        # sources = item.get("sources", "")
+        # region = item.get("region", "global")
+        # language = item.get("language", "en")
 
         # Validate required fields
         if not category_name or not topics:
@@ -405,20 +405,20 @@ def add_user_preferences(request):
             user=user,
             category=category_obj,
             topics=topics.strip(),
-            sources=sources.strip(),
-            defaults={
-                "region": region,
-                "language": language
-            }
+            # sources=sources.strip(),
+            # defaults={
+            #     "region": region,
+            #     "language": language
+            # }
         )
 
         if created:
             created_items.append({
                 "category": category_name,
                 "topics": topics,
-                "sources": sources,
-                "region": region,
-                "language": language
+                # "sources": sources,
+                # "region": region,
+                # "language": language
             })
 
     return JsonResponse({
@@ -435,7 +435,7 @@ def add_user_preferences(request):
 
 @csrf_exempt
 def delete_user_preference(request):
-    if request.method != "DELETE":
+    if request.method != "POST":
         return JsonResponse({
             "success": False,
             "message": "Method not allowed"
@@ -447,40 +447,33 @@ def delete_user_preference(request):
 
     # Parse JSON body
     try:
-        body = json.loads(request.body.decode("utf-8"))
+        body = json.loads(request.body)
     except:
         return JsonResponse({
             "success": False,
             "message": "Invalid JSON body"
         }, status=400)
 
-    category_name = body.get("category")
-    topic_name = body.get("topics")
+    # category_name = body.get("category")
+    # topic_name = body.get("topics")
+    id = body.get("id")
 
-    if not category_name or not topic_name:
+    # if not category_name or not topic_name:
+    #     return JsonResponse({
+    #         "success": False,
+    #         "message": "'category' and 'topics' fields are required"
+    #     }, status=400)
+
+    if not id :
         return JsonResponse({
             "success": False,
-            "message": "'category' and 'topics' fields are required"
-        }, status=400)
+            "message": "'ID' fields are required"
+        }, status=400)    
 
-    # Step 1: Find category belonging to this user
-    try:
-        category_obj = PreferenceCategory.objects.get(
-            user=user,
-            category=category_name
-        )
-    except PreferenceCategory.DoesNotExist:
-        return JsonResponse({
-            "success": False,
-            "message": "Category not found for this user"
-        }, status=404)
-
-    # Step 2: Find the specific preference row (category + topic)
+    # Step 2: Find the specific preference row 
     try:
         pref = UserPreferences.objects.get(
-            user=user,
-            category=category_obj,
-            topics=topic_name
+            id = id
         )
     except UserPreferences.DoesNotExist:
         return JsonResponse({
@@ -493,7 +486,7 @@ def delete_user_preference(request):
 
     return JsonResponse({
         "success": True,
-        "message": f"Topic '{topic_name}' removed from category '{category_name}'"
+        #"message": f"Topic '{topic_name}' removed from category '{category_name}'"
     }, status=200)
 
 @csrf_exempt
@@ -504,7 +497,7 @@ def delete_all_preferences(request):
         return error
 
     # Validate method
-    if request.method != "DELETE":
+    if request.method != "POST":
         return JsonResponse({
             "success": False,
             "message": "Method not allowed"
@@ -512,8 +505,8 @@ def delete_all_preferences(request):
 
     # Fetch all preferences for the user
     prefs = UserPreferences.objects.filter(user=user)
-    
-    if not prefs.exists():
+    print(prefs)
+    if not prefs:
         return JsonResponse({
             "success": False,
             "message": "No preferences found for this user"
@@ -764,3 +757,73 @@ def logout(request):
 
     return response
 
+# {
+#     "success": False,
+#     "message": "Categories fetched successfully",
+#     "categories": [
+#         {
+#             "category": "Technology"
+#         },
+#         {
+#             "category": "Sports"
+#         },
+#         {
+#             "category": "Politics"
+#         },
+#         {
+#             "category": "Football"
+#         },
+#         {
+#             "category": "GeoPolitics"
+#         },
+#         {
+#             "category": "Badminton"
+#         },
+#         {
+#             "category": "technology"
+#         },
+#         {
+#             "category": "science"
+#         },
+#         {
+#             "category": "Football"
+#         },
+#         {
+#             "category": "Politics"
+#         },
+#         {
+#             "category": "Badminton"
+#         },
+#         {
+#             "category": "Technology"
+#         },
+#         {
+#             "category": "Badminton"
+#         }
+#     ]
+# }
+
+
+from django.views.decorators.http import require_GET
+@require_GET
+def get_categories(request):
+    user, error = getUser(request)
+    if error:
+        return error
+
+    categories = PreferenceCategory.objects.all()
+
+    if not categories.exists():
+        return JsonResponse({
+            "success": False,
+            "message": "No categories found",
+        }, status=404)
+
+    # Extract category strings
+    result = [{"category": cat.category} for cat in categories]
+
+    return JsonResponse({
+        "success": True,
+        "message": "Categories fetched successfully",
+        "categories": result,
+    }, status=200)
